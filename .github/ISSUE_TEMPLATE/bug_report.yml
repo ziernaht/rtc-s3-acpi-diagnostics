@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible simulation, emulator, or hardware issue
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: test_type
+    attributes:
+      label: Where did this happen?
+      options:
+        - Host simulation
+        - Emulator or virtual machine
+        - Physical hardware
+        - Loader integration
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform / device
+      description: Include model and CPU/chipset if known.
+      placeholder: Unknown is fine
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware / BIOS version
+  - type: input
+    id: source_commit
+    attributes:
+      label: Source commit
+      description: Git commit hash tested.
+  - type: input
+    id: compiler
+    attributes:
+      label: Compiler and version
+  - type: input
+    id: command
+    attributes:
+      label: Build and test command
+  - type: input
+    id: result
+    attributes:
+      label: Return code and rtc_s3_strerror() text
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact serial numbers, email addresses, private paths, IP/MAC addresses, and credentials before posting.
+      render: text
