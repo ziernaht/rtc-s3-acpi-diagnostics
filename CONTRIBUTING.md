@@ -45,6 +45,7 @@ For changes to the loader hook:
 - Preserve the behavior where a diagnostic failure is logged and the loader continues booting.
 - Keep NMI masked when the environment has no usable IDT, as the current hook does.
 - Run `git apply --stat integrations/vivalalvent/rtc-s3-selftest-hook.diff` to validate patch syntax.
+- Run `python3 tests/check_integration_patch.py` to confirm the embedded source/header copies match the canonical files.
 - Recheck applicability, code size, and integration assumptions against the exact target loader revision.
 - Do not present the supplied VivaLaVent patch as universally applicable.
 
