@@ -113,12 +113,13 @@ The patch in `integrations/vivalalvent/rtc-s3-selftest-hook.diff` is a **project
 Before applying it to a separate VivaLaVent checkout:
 
 1. Review the patch and identify the target loader revision/layout it expects.
-2. Run `git apply --check /path/to/rtc-s3-selftest-hook.diff` from the loader repository.
-3. Apply it only if the check succeeds; inspect the resulting changes before building.
-4. Follow the target loader's build instructions and verify its code-cave/blob-size limit. The supplied patch includes an 8 KiB size check for the layout it targets.
-5. Keep the feature opt-in. The patch is intended to run the dry-run diagnostic, not to enter S3.
+2. From this repository, run `git apply --stat integrations/vivalalvent/rtc-s3-selftest-hook.diff` to verify the diff is syntactically valid.
+3. In the target loader repository, run `git apply --check /path/to/rtc-s3-selftest-hook.diff` to verify that its context matches your exact checkout.
+4. Apply it only if the check succeeds; inspect the resulting changes before building.
+5. Follow the target loader's build instructions and verify its code-cave/blob-size limit. The supplied patch includes an 8 KiB size check for the layout it targets.
+6. Keep the feature opt-in. The patch is intended to run the dry-run diagnostic, not to enter S3.
 
-The repository's top-level `Makefile` runs host tests only. The optional `RTC_S3_SELFTEST=1` build flag belongs to the separate loader integration patch, not to this standalone repository.
+CI checks the patch's syntax with `git apply --stat`; it cannot verify applicability without the exact target loader source revision. The repository's top-level `Makefile` runs host tests only. The optional `RTC_S3_SELFTEST=1` build flag belongs to the separate loader integration patch, not to this standalone repository.
 
 ## Safety and limitations
 
