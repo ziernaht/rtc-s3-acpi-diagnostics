@@ -997,7 +997,8 @@ index 0000000..1504197
 +
 +static bool cmos_alarm_idx_ok(uint8_t idx)
 +{
-+    return idx == 0 || (idx > RTC_REG_D && idx < 0x80);+}
++    return idx == 0 || (idx > RTC_REG_D && idx < 0x80);
++}
 +
 +int rtc_s3_init(const rtc_s3_config_t *c)
 +{
@@ -1163,7 +1164,6 @@ index 0000000..1504197
 +    *out = (uint16_t)a;
 +    return true;
 +}
-+
 +static int fadt_parse(const uint8_t *f, uint32_t len, rtc_s3_config_t *c,
 +                      uint64_t *dsdt)
 +{

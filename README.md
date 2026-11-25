@@ -119,7 +119,7 @@ Before applying it to a separate VivaLaVent checkout:
 5. Follow the target loader's build instructions and verify its code-cave/blob-size limit. The supplied patch includes an 8 KiB size check for the layout it targets.
 6. Keep the feature opt-in. The patch is intended to run the dry-run diagnostic, not to enter S3.
 
-CI checks the patch's syntax with `git apply --stat`; it cannot verify applicability without the exact target loader source revision. The repository's top-level `Makefile` runs host tests only. The optional `RTC_S3_SELFTEST=1` build flag belongs to the separate loader integration patch, not to this standalone repository.
+CI checks patch syntax with `git apply --stat` and verifies that the embedded C/header snapshots match the canonical files in this repository. It cannot verify applicability without the exact target loader source revision. The repository's top-level `Makefile` runs host tests only. The optional `RTC_S3_SELFTEST=1` build flag belongs to the separate loader integration patch, not to this standalone repository.
 
 ## Safety and limitations
 
