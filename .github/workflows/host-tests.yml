@@ -27,6 +27,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Validate integration patch syntax
+        run: git apply --stat integrations/vivalalvent/rtc-s3-selftest-hook.diff
+
       - name: Run host simulations
         run: |
           make clean

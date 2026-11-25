@@ -44,7 +44,8 @@ For changes to the loader hook:
 - Keep it opt-in and default to `RTC_S3_DRY_RUN`.
 - Preserve the behavior where a diagnostic failure is logged and the loader continues booting.
 - Keep NMI masked when the environment has no usable IDT, as the current hook does.
-- Recheck code size and integration assumptions against the exact target loader revision.
+- Run `git apply --stat integrations/vivalalvent/rtc-s3-selftest-hook.diff` to validate patch syntax.
+- Recheck applicability, code size, and integration assumptions against the exact target loader revision.
 - Do not present the supplied VivaLaVent patch as universally applicable.
 
 ## Reporting hardware results

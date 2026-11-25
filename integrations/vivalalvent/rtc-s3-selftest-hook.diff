@@ -163,7 +163,7 @@ new file mode 100644
 index 0000000..1504197
 --- /dev/null
 +++ b/shellcode_hv/rtc_s3_sleep.c
-@@ -0,0 +1,1131 @@
+@@ -0,0 +1,1130 @@
 +/*
 + * rtc_s3_sleep.c - RTC-alarm-timed S3 entry (and dry run) for a bare-metal
 + *                  x86-64 loader. Runtime-configured: no build-time ports.
