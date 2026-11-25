@@ -12,6 +12,45 @@ This code was originally developed/tested in the context of a bare-metal x86-64 
 - `shellcode_hv/rtc_s3_hook.c`, `shellcode_hv/rtc_s3_hook.h` — example integration hook extracted from the supplied patch.
 - `integrations/vivalalvent/rtc-s3-selftest-hook.diff` — original integration patch for the target loader tree; it is not a generic patch for arbitrary projects.
 
+
+
+## What could developers use this for?
+
+This is primarily a **low-level diagnostic and reference utility**, not an end-user application. It may be useful to developers working on:
+
+- **Bootloaders and pre-OS environments:** test whether a loader can discover ACPI sleep information and arm the legacy RTC alarm before handing control to an OS.
+- **Firmware and motherboard bring-up:** investigate whether the RTC alarm signal is reflected in the ACPI PM1 fixed-event status register (RTC_STS).
+- **ACPI implementations and emulators:** compare expected RTC/PM1 register behavior against a controlled host-side model, and use the tests as a starting point for regression coverage.
+- **S3 wake debugging:** separate “the RTC alarm fired” from “the ACPI PM1 event block observed it”. That distinction can help narrow down a broken wake path.
+- **Legacy x86 platform research:** study CMOS RTC alarm programming, BCD versus binary time, 12/24-hour handling, FADT fields, _S3_ parsing, and PM1 event enable/status handling.
+- **Porting experiments:** adapt the runtime configuration and logger to another bare-metal x86-64 loader, hypervisor, or firmware test harness.
+
+### What question does it help answer?
+
+In its dry-run mode, it arms the RTC alarm for a short delay, then checks two independent signs:
+
+1. Did the RTC itself report its alarm flag (Reg C.AF)?
+2. Did the ACPI PM1 event block report the RTC fixed event (PM1_STS.RTC_STS)?
+
+That gives a useful diagnostic split:
+
+- **Both flags observed:** the RTC alarm occurred and reached the ACPI PM1 event status path in that test environment.
+- **RTC flag only:** the RTC alarm occurred, but the PM1 event status bit was not observed; investigate event routing, PM1 register mapping, enable bits, or platform quirks.
+- **PM1 status only:** the ACPI event status was observed without the RTC alarm flag being captured; investigate timing, register-C read/clear behavior, or the simulation/platform model.
+- **Neither flag:** the alarm did not appear to fire within the polling window, or the RTC configuration/clock/alarm path needs investigation.
+
+These are diagnostic observations, not proof that the machine can successfully suspend and resume.
+
+### What it is not
+
+- Not a Linux utility or a desktop app.
+- Not a fan-control tool, PS5 performance tweak, or general PS5 compatibility fix.
+- Not a replacement for Linux's ACPI/RTC drivers.
+- Not a complete ACPI S3 suspend/resume implementation.
+- Not proof of S3 support merely because the host simulations pass.
+
+The optional real-S3 path is a low-level entry experiment only. A real platform integration still needs a valid resume path, FACS waking-vector handling, platform preparation, device quiescing, CPU coordination, and state restoration. Do not enable it on a machine unless the surrounding loader/platform code implements those pieces and the risks are understood.
+
 ## Capabilities
 
 - Reads RTC time with UIP guarding and repeated reads.
@@ -88,4 +127,4 @@ Experimental reference code, not a maintained cross-platform library. Contributi
 
 ## License
 
-No license has been assigned yet. Until the author chooses and adds a license, default copyright applies; viewing and reviewing the code does not automatically grant permission to redistribute or incorporate it. Please ask before reusing it in another project.
+This repository is licensed under the MIT License; see [LICENSE](LICENSE).
