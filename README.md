@@ -1,130 +1,159 @@
-# RTC-alarm ACPI S3 utility for bare-metal x86-64 loaders
+# RTC/ACPI S3 diagnostics for bare-metal x86-64
 
-A small, runtime-configured C implementation for arming the CMOS RTC alarm and checking whether it reaches the ACPI PM1 fixed-event status bit. It includes a non-destructive dry-run mode, an optional real S3 entry path, ACPI table discovery, diagnostic logging, and host-side simulations.
+[![Host tests](https://github.com/ziernaht/rtc-s3-acpi-diagnostics/actions/workflows/host-tests.yml/badge.svg)](https://github.com/ziernaht/rtc-s3-acpi-diagnostics/actions/workflows/host-tests.yml)
 
-This code was originally developed/tested in the context of a bare-metal x86-64 loader. It is published here as an experimental, standalone reference for firmware, bootloader, and low-level power-management developers to review and adapt.
+An experimental C reference utility for testing whether a CMOS RTC alarm is observed by the ACPI PM1 fixed-event block. It is intended for bare-metal bootloader, firmware, hypervisor, and low-level platform developers.
 
-## What is included
+**Start here:** run the host simulations with `make test`. You do not need real hardware to build or run those tests.
 
-- `rtc_s3_sleep.c`, `rtc_s3_sleep.h` — core RTC/ACPI implementation and public API.
-- `tests/test_rtc_s3_sim.c` — host simulation of CMOS RTC, PM1 registers, ACPI tables, dry-run and real-S3 control flow.
-- `tests/test_rtc_s3_hook_sim.c` — host test of the optional boot-time UART hook.
-- `shellcode_hv/rtc_s3_hook.c`, `shellcode_hv/rtc_s3_hook.h` — example integration hook extracted from the supplied patch.
-- `integrations/vivalalvent/rtc-s3-selftest-hook.diff` — original integration patch for the target loader tree; it is not a generic patch for arbitrary projects.
+> **Important:** this is not a complete ACPI suspend/resume implementation. The normal test mode does not enter S3, but it still performs RTC and PM1 register I/O. The optional real-S3 function can leave the CPU without a usable resume path unless the surrounding loader implements the missing platform work. Do not enable real S3 on a machine just to see whether it works.
 
+## What problem does it investigate?
 
+An RTC alarm and an ACPI wake event are related, but they are not the same observation. This utility records two signals:
 
-## What could developers use this for?
+1. **RTC Reg C.AF** — the CMOS RTC reports that its alarm fired.
+2. **PM1_STS.RTC_STS** — the ACPI PM1 event block reports the RTC fixed event.
 
-This is primarily a **low-level diagnostic and reference utility**, not an end-user application. It may be useful to developers working on:
+Seeing both is useful evidence that the RTC alarm reached the PM1 event-status path in the environment being tested. Seeing only one helps narrow down where to investigate.
 
-- **Bootloaders and pre-OS environments:** test whether a loader can discover ACPI sleep information and arm the legacy RTC alarm before handing control to an OS.
-- **Firmware and motherboard bring-up:** investigate whether the RTC alarm signal is reflected in the ACPI PM1 fixed-event status register (RTC_STS).
-- **ACPI implementations and emulators:** compare expected RTC/PM1 register behavior against a controlled host-side model, and use the tests as a starting point for regression coverage.
-- **S3 wake debugging:** separate “the RTC alarm fired” from “the ACPI PM1 event block observed it”. That distinction can help narrow down a broken wake path.
-- **Legacy x86 platform research:** study CMOS RTC alarm programming, BCD versus binary time, 12/24-hour handling, FADT fields, _S3_ parsing, and PM1 event enable/status handling.
-- **Porting experiments:** adapt the runtime configuration and logger to another bare-metal x86-64 loader, hypervisor, or firmware test harness.
+The result is diagnostic evidence, not proof that a complete S3 suspend/resume cycle will work.
 
-### What question does it help answer?
+## Quick start: run the host simulations
 
-In its dry-run mode, it arms the RTC alarm for a short delay, then checks two independent signs:
+### Requirements
 
-1. Did the RTC itself report its alarm flag (Reg C.AF)?
-2. Did the ACPI PM1 event block report the RTC fixed event (PM1_STS.RTC_STS)?
+- GCC or Clang
+- GNU Make
+- A C11-capable compiler (the hook simulation uses GNU11)
 
-That gives a useful diagnostic split:
-
-- **Both flags observed:** the RTC alarm occurred and reached the ACPI PM1 event status path in that test environment.
-- **RTC flag only:** the RTC alarm occurred, but the PM1 event status bit was not observed; investigate event routing, PM1 register mapping, enable bits, or platform quirks.
-- **PM1 status only:** the ACPI event status was observed without the RTC alarm flag being captured; investigate timing, register-C read/clear behavior, or the simulation/platform model.
-- **Neither flag:** the alarm did not appear to fire within the polling window, or the RTC configuration/clock/alarm path needs investigation.
-
-These are diagnostic observations, not proof that the machine can successfully suspend and resume.
-
-### What it is not
-
-- Not a Linux utility or a desktop app.
-- Not a fan-control tool, PS5 performance tweak, or general PS5 compatibility fix.
-- Not a replacement for Linux's ACPI/RTC drivers.
-- Not a complete ACPI S3 suspend/resume implementation.
-- Not proof of S3 support merely because the host simulations pass.
-
-The optional real-S3 path is a low-level entry experiment only. A real platform integration still needs a valid resume path, FACS waking-vector handling, platform preparation, device quiescing, CPU coordination, and state restoration. Do not enable it on a machine unless the surrounding loader/platform code implements those pieces and the risks are understood.
-
-## Capabilities
-
-- Reads RTC time with UIP guarding and repeated reads.
-- Handles BCD/binary and 12/24-hour RTC encodings.
-- Programs the RTC seconds/minutes/hours alarm and optional FADT day/month alarm registers.
-- Clears and verifies stale PM1 status, arms the RTC fixed-event enable, and checks whether the alarm reaches `PM1_STS.RTC_STS`.
-- Supports a dry run that does **not** write `SLP_EN`.
-- Includes an optional real-S3 path that writes `SLP_TYP` and `SLP_EN` after arming and checking the alarm.
-- Discovers relevant ACPI information through RSDP → RSDT/XSDT → FADT → DSDT (`_S3_`).
-
-## Build and run host tests
-
-Requirements: GCC or Clang with C11/GNU11 support. The tests use AddressSanitizer and UndefinedBehaviorSanitizer when available.
+### Build and run
 
 ```sh
+git clone https://github.com/ziernaht/rtc-s3-acpi-diagnostics.git
+cd rtc-s3-acpi-diagnostics
 make test
 ```
 
-Or compile individually:
+The test target builds and runs two host-side programs:
+
+- `tests/test_rtc_s3_sim.c` exercises the RTC/PM1 model, dry-run and real-S3 control flow, result reporting, and synthetic ACPI tables.
+- `tests/test_rtc_s3_hook_sim.c` checks the optional UART hook, including failure logging and the guarantee that the hook uses dry-run mode.
+
+A successful run ends with:
+
+```text
+ALL SIM TESTS OK
+ALL HOOK TESTS OK
+```
+
+To remove the generated test executables:
 
 ```sh
-gcc -std=c11 -g -fsanitize=address,undefined -Wall -Wextra -I. \\
-  tests/test_rtc_s3_sim.c -o test_rtc_s3_sim
-./test_rtc_s3_sim
-
-gcc -std=gnu11 -g -fsanitize=address,undefined -Wall -Wextra -I. \\
-  -Ishellcode_hv -Itests/support tests/test_rtc_s3_hook_sim.c \\
-  -o test_rtc_s3_hook_sim
-./test_rtc_s3_hook_sim
+make clean
 ```
 
-The hook test uses a tiny `tests/support/utils.h` shim for the bootloader's UART `printf` declaration. The actual loader integration must use the target project's real `utils.h` and build environment.
+The simulations are the safe starting point for development. They do not access the host machine's physical RTC, PM1 registers, or S3 sleep state.
 
-## API outline
+## What the code does
 
-A typical loader integration is:
+- Reads RTC time with update-in-progress (UIP) guarding and repeated reads.
+- Handles BCD/binary and 12/24-hour RTC encodings.
+- Programs the RTC seconds, minutes, and hours alarm, plus optional FADT day/month alarm registers.
+- Discovers ACPI information through RSDP → RSDT/XSDT → FADT → DSDT and looks for a static `_S3_` package.
+- Clears and verifies stale RTC/PM1 status, enables the RTC alarm event, and checks whether the alarm appears in PM1 status.
+- Provides a **dry-run** path that never writes `PM1_CNT.SLP_EN`.
+- Includes an optional real-S3 entry path for integration experiments.
 
-```c
-rtc_s3_config_t cfg;
-rtc_s3_set_logger(loader_uart_log);
+See [Architecture](docs/architecture.md) for the execution flow and parser limitations.
 
-if (rtc_s3_config_from_acpi(&cfg, rsdp_phys, physical_to_virtual) == 0 &&
-    rtc_s3_init(&cfg) == 0) {
-    rtc_s3_selftest(10, RTC_S3_DRY_RUN);
-}
+## Interpreting results
+
+| Observation/result | What it indicates |
+| --- | --- |
+| `RTC_S3_OK` / result `0` | The expected RTC and PM1 status signals were both observed for the selected path. |
+| `RTC_S3_DRY_NO_PM1` / `-30` | RTC alarm flag was observed, but PM1 RTC status was not. Investigate routing, PM1 mapping, enable bits, and platform behavior. |
+| `RTC_S3_DRY_NO_ALARM` / `-31` | Neither signal was observed during the polling window. |
+| `RTC_S3_DRY_PM1_ONLY` / `-32` | PM1 RTC status was observed, but the RTC alarm flag was not captured. Investigate timing and read-to-clear behavior. |
+| `RTC_S3_ERR_ACPI_*` | ACPI discovery or supported-table parsing failed. |
+| Other negative result | See `rtc_s3_strerror()` in `rtc_s3_sleep.c` and the enum in `rtc_s3_sleep.h`. |
+
+A result from a host simulation describes the simulated model only. A result from physical hardware should include the platform, firmware version, compiler, exact test mode, return code, and relevant UART log. Use the [hardware report template](docs/hardware-report-template.md).
+
+## Repository layout
+
+```text
+.
+├── rtc_s3_sleep.c                 # RTC/ACPI implementation
+├── rtc_s3_sleep.h                 # Public configuration, API, and result codes
+├── shellcode_hv/
+│   ├── rtc_s3_hook.c              # Optional boot-time UART hook example
+│   └── rtc_s3_hook.h
+├── tests/
+│   ├── test_rtc_s3_sim.c          # Core host simulation
+│   ├── test_rtc_s3_hook_sim.c     # Hook host simulation
+│   └── support/utils.h            # Test-only UART declaration shim
+├── integrations/
+│   └── vivalalvent/
+│       └── rtc-s3-selftest-hook.diff
+├── docs/
+│   ├── architecture.md
+│   └── hardware-report-template.md
+├── .github/workflows/host-tests.yml
+├── CONTRIBUTING.md
+└── LICENSE
 ```
 
-See `rtc_s3_sleep.h` for configuration fields, return codes, and the full API. `rtc_s3_dry_run()` is limited to short delays; `configure_rtc_s3_sleep()` is the real-S3 entry function.
+## Using it in a loader
 
-## Important safety and portability limitations
+This repository is a standalone reference and host-test project; it is not the full VivaLaVent loader and does not produce a ready-to-install PS5 payload by itself.
 
-**This is not a complete suspend/resume implementation and must not be treated as safe to enable on arbitrary hardware.**
+The patch in `integrations/vivalalvent/rtc-s3-selftest-hook.diff` is a **project-specific integration example**. It adds an opt-in boot-time dry run and a polled-UART hook to a particular loader layout. It is not a generic patch for other loaders or arbitrary revisions.
 
-The core does not perform the platform's complete ACPI sleep transition. In particular, a loader integrating real S3 must separately handle:
+Before applying it to a separate VivaLaVent checkout:
+
+1. Review the patch and identify the target loader revision/layout it expects.
+2. Run `git apply --check /path/to/rtc-s3-selftest-hook.diff` from the loader repository.
+3. Apply it only if the check succeeds; inspect the resulting changes before building.
+4. Follow the target loader's build instructions and verify its code-cave/blob-size limit. The supplied patch includes an 8 KiB size check for the layout it targets.
+5. Keep the feature opt-in. The patch is intended to run the dry-run diagnostic, not to enter S3.
+
+The repository's top-level `Makefile` runs host tests only. The optional `RTC_S3_SELFTEST=1` build flag belongs to the separate loader integration patch, not to this standalone repository.
+
+## Safety and limitations
+
+### Dry run is not “no hardware access”
+
+The dry-run path does not write `SLP_EN` or enter S3. It still performs privileged RTC/PM1 I/O: it programs the alarm registers, changes the RTC alarm-enable bit and PM1 RTC event-enable bit, reads RTC Reg C (which is read-to-clear), and clears stale PM1 status flags. Use it only in an environment where direct port I/O is appropriate and where those register effects are understood.
+
+### Real S3 is incomplete
+
+The real-S3 function is an entry experiment, not a full sleep-state implementation. The surrounding loader/platform code must separately provide, at minimum:
 
 - ACPI `_PTS` / `_GTS` methods and platform-specific preparation;
 - device quiescing and chipset/platform state save;
-- parking or otherwise coordinating additional CPUs;
+- coordination or parking of additional CPUs;
 - FACS waking-vector setup and a valid resume path;
-- restoring execution state after the CPU loses state during S3;
-- correct PM1 register addresses, lengths, sleep types, and platform-specific quirks.
+- restoration of CPU and platform execution state after S3;
+- correct PM1 addresses, lengths, sleep types, and platform-specific handling.
 
-The dry-run path is intended for diagnostics and never writes `SLP_EN`; it still performs RTC/PM1 I/O and should only be used in an environment where direct port I/O is appropriate. The host simulator validates software logic against a model, **not** real firmware, chipset, or motherboard behavior. Passing the tests is not evidence that a machine supports RTC-triggered S3 wake.
+The code uses privileged x86 instructions including port I/O, `cli`, `wbinvd`, and `sti` outside host simulation. Compile for the target environment; the source notes the `-mno-red-zone` requirement.
 
-The implementation uses privileged x86 port I/O, `cli`, `wbinvd`, and `sti` instructions outside host simulation. Build for the target environment, and compile the loader with `-mno-red-zone` as noted in the source.
+### ACPI parsing is deliberately limited
 
-## Integration patch
+The built-in AML scan is a small heuristic for the common static `Name(_S3_, Package(...))` form with constant byte values. It is not a complete AML interpreter. Firmware using computed AML, unusual encodings, or unsupported PM1 address spaces may require a real ACPI/AML library or explicitly supplied configuration.
 
-The patch in `integrations/vivalalvent/` was written against a specific version/layout of the VivaLaVent PS5 loader. It adds an opt-in boot-time dry run, a UART hook, and a blob-size check. It is supplied for provenance and review; it may not apply cleanly to current upstream revisions. Review every hunk and verify the code-cave size and memory layout before use.
+### What this project is not
 
-## Status
+- Not a Linux utility, desktop application, or replacement for Linux ACPI/RTC drivers.
+- Not a PS5 performance tweak or general compatibility fix.
+- Not proof that a console, PC, motherboard, or emulator supports RTC-triggered S3 wake.
+- Not a maintained cross-platform library or a ready-made suspend/resume implementation.
 
-Experimental reference code, not a maintained cross-platform library. Contributions, independent review, hardware reports, and portability fixes are welcome. Please include the exact platform, firmware, ACPI details, and whether results came from simulation or physical hardware when reporting findings.
+## Project status
+
+Experimental reference code. Independent review, simulation improvements, portability work, and clearly documented hardware reports are welcome. See [Contributing](CONTRIBUTING.md).
 
 ## License
 
-This repository is licensed under the MIT License; see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
