@@ -1,2 +1,18 @@
 /test_rtc_s3_sim
 /test_rtc_s3_hook_sim
+
+# Compiler and test outputs
+*.o
+*.d
+*.gcda
+*.gcno
+*.su
+core
+core.*
+
+# Local build and editor artifacts
+/build/
+/.DS_Store
+*.swp
+*.swo
+*~
