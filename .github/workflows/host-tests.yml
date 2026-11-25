@@ -30,6 +30,14 @@ jobs:
       - name: Validate integration patch syntax
         run: git apply --stat integrations/vivalalvent/rtc-s3-selftest-hook.diff
 
+      - name: Verify embedded integration sources
+        run: python3 tests/check_integration_patch.py
+
+      - name: Compile production-mode objects
+        run: |
+          ${{ matrix.compiler }} -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -mno-red-zone -fno-stack-protector -c rtc_s3_sleep.c -o /tmp/rtc_s3_sleep.o
+          ${{ matrix.compiler }} -std=gnu11 -O2 -Wall -Wextra -Werror -ffreestanding -mno-red-zone -fno-stack-protector -I. -Ishellcode_hv -Itests/support -c shellcode_hv/rtc_s3_hook.c -o /tmp/rtc_s3_hook.o
+
       - name: Run host simulations
         run: |
           make clean
